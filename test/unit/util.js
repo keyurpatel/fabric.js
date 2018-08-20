@@ -722,6 +722,13 @@
     assert.deepEqual(fabric.charWidthsCache, { }, 'all cache is deleted');
   });
 
+  QUnit.test('clearFabricFontCache wrong case', function(assert) {
+    fabric.charWidthsCache = { arial: { some: 'cache'}, helvetica: { some: 'cache'} };
+    fabric.util.clearFabricFontCache('ARIAL');
+    assert.equal(fabric.charWidthsCache.arial,  undefined, 'arial cache is deleted');
+    assert.equal(fabric.charWidthsCache.helvetica.some, 'cache', 'helvetica cache is still available');
+  });
+
   QUnit.test('parsePreserveAspectRatioAttribute', function(assert) {
     assert.ok(typeof fabric.util.parsePreserveAspectRatioAttribute === 'function');
     var parsed;
@@ -783,6 +790,30 @@
     assert.equal(rect.flipX, false);
     assert.equal(rect.flipY, false);
     assert.equal(rect.angle, 0);
+  });
+
+  QUnit.test('saveObjectTransform', function(assert) {
+    assert.ok(typeof fabric.util.saveObjectTransform === 'function');
+    var rect = new fabric.Rect({
+      top: 1,
+      width: 100,
+      height: 100,
+      angle: 30,
+      scaleX: 2,
+      scaleY: 1,
+      flipX: true,
+      flipY: true,
+      skewX: 30,
+      skewY: 30
+    });
+    var transform = fabric.util.saveObjectTransform(rect);
+    assert.equal(transform.skewX, 30);
+    assert.equal(transform.skewY, 30);
+    assert.equal(transform.scaleX, 2);
+    assert.equal(transform.scaleY, 1);
+    assert.equal(transform.flipX, true);
+    assert.equal(transform.flipY, true);
+    assert.equal(transform.angle, 30);
   });
 
   QUnit.test('invertTransform', function(assert) {

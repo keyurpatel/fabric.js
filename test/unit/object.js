@@ -52,6 +52,9 @@
       fabric.perfLimitSizeTotal = 2097152;
       fabric.maxCacheSideLimit = 4096;
       fabric.minCacheSideLimit = 256;
+      fabric.devicePixelRatio = 1;
+      canvas.enableRetinaScaling = false;
+      canvas.setZoom(1);
       canvas.clear();
       canvas.backgroundColor = fabric.Canvas.prototype.backgroundColor;
       canvas.calcOffset();
@@ -148,7 +151,7 @@
 
   QUnit.test('toJSON', function(assert) {
     var emptyObjectJSON = '{"type":"object","version":"' + fabric.version + '","originX":"left","originY":"top","left":0,"top":0,"width":0,"height":0,"fill":"rgb(0,0,0)",' +
-                          '"stroke":null,"strokeWidth":1,"strokeDashArray":null,"strokeLineCap":"butt","strokeLineJoin":"miter","strokeMiterLimit":10,' +
+                          '"stroke":null,"strokeWidth":1,"strokeDashArray":null,"strokeLineCap":"butt","strokeLineJoin":"miter","strokeMiterLimit":4,' +
                           '"scaleX":1,"scaleY":1,"angle":0,"flipX":false,"flipY":false,"opacity":1,' +
                           '"shadow":null,"visible":true,"clipTo":null,"backgroundColor":"","fillRule":"nonzero","paintFirst":"fill","globalCompositeOperation":"source-over",' +
                           '"transformMatrix":null,"skewX":0,"skewY":0}';
@@ -191,7 +194,7 @@
       'strokeDashArray':          null,
       'strokeLineCap':            'butt',
       'strokeLineJoin':           'miter',
-      'strokeMiterLimit':         10,
+      'strokeMiterLimit':         4,
       'scaleX':                   1,
       'scaleY':                   1,
       'angle':                    0,
@@ -989,13 +992,30 @@
     assert.equal(typeof deserializedObject.clipTo, 'function');
   });
 
-  QUnit.test('getObjectScale', function(assert) {
+  QUnit.test('getTotalObjectScaling with zoom', function(assert) {
+    var object = new fabric.Object({ scaleX: 3, scaleY: 2});
+    canvas.setZoom(3);
+    canvas.add(object);
+    var objectScale = object.getTotalObjectScaling();
+    assert.deepEqual(objectScale, { scaleX: object.scaleX * 3, scaleY: object.scaleY * 3 });
+  });
+
+  QUnit.test('getTotalObjectScaling with retina', function(assert) {
+    var object = new fabric.Object({ scaleX: 3, scaleY: 2});
+    canvas.enableRetinaScaling = true;
+    fabric.devicePixelRatio = 4;
+    canvas.add(object);
+    var objectScale = object.getTotalObjectScaling();
+    assert.deepEqual(objectScale, { scaleX: object.scaleX * 4, scaleY: object.scaleY * 4 });
+  });
+
+  QUnit.test('getObjectScaling', function(assert) {
     var object = new fabric.Object({ scaleX: 3, scaleY: 2});
     var objectScale = object.getObjectScaling();
     assert.deepEqual(objectScale, {scaleX: object.scaleX, scaleY: object.scaleY});
   });
 
-  QUnit.test('getObjectScale in group', function(assert) {
+  QUnit.test('getObjectScaling in group', function(assert) {
     var object = new fabric.Object({ scaleX: 3, scaleY: 2});
     var group = new fabric.Group();
     group.scaleX = 2;
@@ -1019,13 +1039,21 @@
     assert.equal(object.dirty, true, 'after setting a property from cache, dirty flag is true');
   });
 
+  QUnit.test('_createCacheCanvas sets object as dirty', function(assert) {
+    var object = new fabric.Object({ scaleX: 3, scaleY: 2, width: 1, height: 2});
+    assert.equal(object.dirty, true, 'object is dirty after creation');
+    object.dirty = false;
+    assert.equal(object.dirty, false, 'object is not dirty after specifying it');
+    object._createCacheCanvas();
+    assert.equal(object.dirty, true, 'object is dirty again if cache gets created');
+  });
+
   QUnit.test('isCacheDirty statefullCache disabled', function(assert) {
     var object = new fabric.Object({ scaleX: 3, scaleY: 2, width: 1, height: 2});
     assert.equal(object.dirty, true, 'object is dirty after creation');
     object.cacheProperties = ['propA', 'propB'];
     object.dirty = false;
     object.statefullCache = false;
-    object._createCacheCanvas();
     assert.equal(object.isCacheDirty(), false, 'object is not dirty if dirty flag is false');
     object.dirty = true;
     assert.equal(object.isCacheDirty(), true, 'object is dirty if dirty flag is true');
@@ -1037,9 +1065,6 @@
     object.dirty = false;
     object.statefullCache = true;
     object.propA = 'A';
-    object.setupState({ propertySet: 'cacheProperties' });
-    object._createCacheCanvas();
-    assert.equal(object.isCacheDirty(), true, 'object is dirty if canvas has been just created');
     object.setupState({ propertySet: 'cacheProperties' });
     assert.equal(object.isCacheDirty(), false, 'object is not dirty');
     object.propA = 'B';

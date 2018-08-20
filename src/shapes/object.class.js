@@ -28,6 +28,12 @@
    * @fires selected
    * @fires deselected
    * @fires modified
+   * @fires modified
+   * @fires moved
+   * @fires scaled
+   * @fires rotated
+   * @fires skewed
+   *
    * @fires rotating
    * @fires scaling
    * @fires moving
@@ -334,7 +340,7 @@
      * @type Number
      * @default
      */
-    strokeMiterLimit:         10,
+    strokeMiterLimit:         4,
 
     /**
      * Shadow object representing shadow of this shape
@@ -435,7 +441,9 @@
     includeDefaultValues:     true,
 
     /**
-     * Function that determines clipping of an object (context is passed as a first argument)
+     * Function that determines clipping of an object (context is passed as a first argument).
+     * If you are using code minification, ctx argument can be minified/manglied you should use
+     * as a workaround `var ctx = arguments[0];` in the function;
      * Note that context origin is at the object's center point (not left/top corner)
      * @deprecated since 2.0.0
      * @type Function
@@ -585,6 +593,9 @@
 
     /**
      * List of properties to consider when checking if cache needs refresh
+     * Those properties are checked by statefullCache ON ( or lazy mode if we want ) or from single
+     * calls to Object.set(key, value). If the key is in this list, the object is marked as dirty
+     * and refreshed at the next render
      * @type Array
      */
     cacheProperties: (
@@ -608,9 +619,11 @@
      */
     _createCacheCanvas: function() {
       this._cacheProperties = {};
-      this._cacheCanvas = fabric.document.createElement('canvas');
+      this._cacheCanvas = fabric.util.createCanvasElement();
       this._cacheContext = this._cacheCanvas.getContext('2d');
       this._updateCacheCanvas();
+      // if canvas gets created, is empty, so dirty.
+      this.dirty = true;
     },
 
     /**
@@ -670,12 +683,10 @@
      * @return {Object}.zoomY zoomY zoom value to unscale the canvas before drawing cache
      */
     _getCacheCanvasDimensions: function() {
-      var zoom = this.canvas && this.canvas.getZoom() || 1,
-          objectScale = this.getObjectScaling(),
-          retina = this.canvas && this.canvas._isRetinaScaling() ? fabric.devicePixelRatio : 1,
+      var objectScale = this.getTotalObjectScaling(),
           dim = this._getNonTransformedDimensions(),
-          zoomX = objectScale.scaleX * zoom * retina,
-          zoomY = objectScale.scaleY * zoom * retina,
+          zoomX = objectScale.scaleX,
+          zoomY = objectScale.scaleY,
           width = dim.x * zoomX,
           height = dim.y * zoomY;
       return {
@@ -883,6 +894,21 @@
     },
 
     /**
+     * Return the object scale factor counting also the group scaling, zoom and retina
+     * @return {Object} object with scaleX and scaleY properties
+     */
+    getTotalObjectScaling: function() {
+      var scale = this.getObjectScaling(), scaleX = scale.scaleX, scaleY = scale.scaleY;
+      if (this.canvas) {
+        var zoom = this.canvas.getZoom();
+        var retina = this.canvas.getRetinaScaling();
+        scaleX *= zoom * retina;
+        scaleY *= zoom * retina;
+      }
+      return { scaleX: scaleX, scaleY: scaleY };
+    },
+
+    /**
      * Return the object opacity counting also the group property
      * @return {Number}
      */
@@ -996,6 +1022,7 @@
       if (this.shouldCache()) {
         if (!this._cacheCanvas) {
           this._createCacheCanvas();
+
         }
         if (this.isCacheDirty()) {
           this.statefullCache && this.saveState({ propertySet: 'cacheProperties' });
@@ -1426,17 +1453,24 @@
      * @param {Number} [options.width] Cropping width. Introduced in v1.2.14
      * @param {Number} [options.height] Cropping height. Introduced in v1.2.14
      * @param {Boolean} [options.enableRetinaScaling] Enable retina scaling for clone image. Introduce in 1.6.4
+     * @param {Boolean} [options.withoutTransform] Remove current object transform ( no scale , no angle, no flip, no skew ). Introduced in 2.3.4
      * @return {String} Returns a data: URL containing a representation of the object in the format specified by options.format
      */
     toDataURL: function(options) {
       options || (options = { });
 
+      var origParams = fabric.util.saveObjectTransform(this);
+
+      if (options.withoutTransform) {
+        fabric.util.resetObjectTransform(this);
+      }
+
       var el = fabric.util.createCanvasElement(),
-          boundingRect = this.getBoundingRect();
+          // skip canvas zoom and calculate with setCoords now.
+          boundingRect = this.getBoundingRect(true, true);
 
       el.width = boundingRect.width;
       el.height = boundingRect.height;
-      fabric.util.wrapElement(el, 'div');
       var canvas = new fabric.StaticCanvas(el, {
         enableRetinaScaling: options.enableRetinaScaling,
         renderOnAddRemove: false,
@@ -1450,11 +1484,6 @@
       if (options.format === 'jpeg') {
         canvas.backgroundColor = '#fff';
       }
-
-      var origParams = {
-        left: this.left,
-        top: this.top
-      };
 
       this.setPositionByOrigin(new fabric.Point(canvas.width / 2, canvas.height / 2), 'center', 'center');
 
@@ -1579,20 +1608,18 @@
      * @param {String} [options.repeat=repeat] Repeat property of a pattern (one of repeat, repeat-x, repeat-y or no-repeat)
      * @param {Number} [options.offsetX=0] Pattern horizontal offset from object's left/top corner
      * @param {Number} [options.offsetY=0] Pattern vertical offset from object's left/top corner
+     * @param {Function} [callback] Callback to invoke when image set as a pattern
      * @return {fabric.Object} thisArg
      * @chainable
      * @see {@link http://jsfiddle.net/fabricjs/QT3pa/|jsFiddle demo}
      * @example <caption>Set pattern</caption>
-     * fabric.util.loadImage('http://fabricjs.com/assets/escheresque_ste.png', function(img) {
-     *   object.setPatternFill({
-     *     source: img,
-     *     repeat: 'repeat'
-     *   });
-     *   canvas.renderAll();
-     * });
+     * object.setPatternFill({
+     *   source: 'http://fabricjs.com/assets/escheresque_ste.png',
+     *   repeat: 'repeat'
+     * },canvas.renderAll.bind(canvas));
      */
-    setPatternFill: function(options) {
-      return this.set('fill', new fabric.Pattern(options));
+    setPatternFill: function(options, callback) {
+      return this.set('fill', new fabric.Pattern(options, callback));
     },
 
     /**

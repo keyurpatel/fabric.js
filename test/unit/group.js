@@ -169,7 +169,7 @@
       'strokeDashArray':          null,
       'strokeLineCap':            'butt',
       'strokeLineJoin':           'miter',
-      'strokeMiterLimit':         10,
+      'strokeMiterLimit':         4,
       'scaleX':                   1,
       'scaleY':                   1,
       'shadow':                   null,
@@ -218,13 +218,13 @@
       strokeWidth: 0
     }];
     var expectedObject = {
-      'version': fabric.version,
-      'type':               'group',
-      'left':               50,
-      'top':                100,
-      'width':              80,
-      'height':             60,
-      'objects':            objects
+      version: fabric.version,
+      type: 'group',
+      left: 50,
+      top: 100,
+      width: 80,
+      height: 60,
+      objects: objects
     };
     assert.deepEqual(clone, expectedObject);
   });
@@ -414,7 +414,7 @@
     var group = makeGroupWith2Objects();
     assert.ok(typeof group.toSVG === 'function');
 
-    var expectedSVG = '<g transform="translate(90 130)" style="">\n\t<rect x="-15" y="-5" rx="0" ry="0" width="30" height="10" style="stroke: none; stroke-width: 0; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 10; fill: rgb(0,0,0); fill-rule: nonzero; opacity: 1;" transform="translate(25 -25)"/>\n\t<rect x="-5" y="-20" rx="0" ry="0" width="10" height="40" style="stroke: none; stroke-width: 0; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 10; fill: rgb(0,0,0); fill-rule: nonzero; opacity: 1;" transform="translate(-35 10)"/>\n</g>\n';
+    var expectedSVG = '<g transform="translate(90 130)" style="">\n\t<rect x="-15" y="-5" rx="0" ry="0" width="30" height="10" style="stroke: none; stroke-width: 0; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 4; fill: rgb(0,0,0); fill-rule: nonzero; opacity: 1;" transform="translate(25 -25)"/>\n\t<rect x="-5" y="-20" rx="0" ry="0" width="10" height="40" style="stroke: none; stroke-width: 0; stroke-dasharray: none; stroke-linecap: butt; stroke-linejoin: miter; stroke-miterlimit: 4; fill: rgb(0,0,0); fill-rule: nonzero; opacity: 1;" transform="translate(-35 10)"/>\n</g>\n';
     assert.equal(group.toSVG(), expectedSVG);
   });
 
