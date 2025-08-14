@@ -190,7 +190,6 @@ export class SelectableCanvas<EventSpec extends CanvasEvents = CanvasEvents>
    * and then mouseup finalizes it and adds an instance of `fabric.Path` onto canvas.
    * @tutorial {@link http://fabricjs.com/fabric-intro-part-4#free_drawing}
    * @type Boolean
-   * @default
    */
   declare isDrawingMode: boolean;
 
@@ -261,21 +260,21 @@ export class SelectableCanvas<EventSpec extends CanvasEvents = CanvasEvents>
 
   /**
    * During a mouse event we may need the pointer multiple times in multiple functions.
-   * _absolutePointer holds a reference to the pointer in fabricCanvas/design coordinates that is valid for the event
+   * _scenePoint holds a reference to the pointer in fabricCanvas/design coordinates that is valid for the event
    * lifespan. Every fabricJS mouse event create and delete the cache every time
    * We do this because there are some HTML DOM inspection functions to get the actual pointer coordinates
    * @type {Point}
    */
-  protected declare _absolutePointer?: Point;
+  declare protected _scenePoint?: Point;
 
   /**
    * During a mouse event we may need the pointer multiple times in multiple functions.
-   * _pointer holds a reference to the pointer in html coordinates that is valid for the event
+   * _viewportPoint holds a reference to the pointer in html coordinates that is valid for the event
    * lifespan. Every fabricJS mouse event create and delete the cache every time
    * We do this because there are some HTML DOM inspection functions to get the actual pointer coordinates
    * @type {Point}
    */
-  protected declare _pointer?: Point;
+  declare protected _viewportPoint?: Point;
 
   /**
    * During a mouse event we may need the target multiple times in multiple functions.
@@ -283,7 +282,7 @@ export class SelectableCanvas<EventSpec extends CanvasEvents = CanvasEvents>
    * lifespan. Every fabricJS mouse event create and delete the cache every time
    * @type {FabricObject}
    */
-  protected declare _target?: FabricObject;
+  declare protected _target?: FabricObject;
 
   static ownDefaults = canvasDefaults;
 
@@ -301,10 +300,10 @@ export class SelectableCanvas<EventSpec extends CanvasEvents = CanvasEvents>
   get wrapperEl() {
     return this.elements.container;
   }
-  private declare pixelFindCanvasEl: HTMLCanvasElement;
-  private declare pixelFindContext: CanvasRenderingContext2D;
+  declare private pixelFindCanvasEl: HTMLCanvasElement;
+  declare private pixelFindContext: CanvasRenderingContext2D;
 
-  protected declare _isCurrentlyDrawing: boolean;
+  declare protected _isCurrentlyDrawing: boolean;
   declare freeDrawingBrush?: BaseBrush;
   declare _activeObject?: FabricObject;
 
@@ -852,7 +851,7 @@ export class SelectableCanvas<EventSpec extends CanvasEvents = CanvasEvents>
       if (this._checkTarget(target, pointer)) {
         if (isCollection(target) && target.subTargetCheck) {
           const subTarget = this._searchPossibleTargets(
-            target._objects as FabricObject[],
+            target._objects,
             pointer,
           );
           subTarget && this.targets.push(subTarget);
@@ -916,10 +915,10 @@ export class SelectableCanvas<EventSpec extends CanvasEvents = CanvasEvents>
    *
    */
   getViewportPoint(e: TPointerEvent) {
-    if (this._pointer) {
-      return this._pointer;
+    if (this._viewportPoint) {
+      return this._viewportPoint;
     }
-    return this.getPointer(e, true);
+    return this._getPointerImpl(e, true);
   }
 
   /**
@@ -935,23 +934,22 @@ export class SelectableCanvas<EventSpec extends CanvasEvents = CanvasEvents>
    *
    */
   getScenePoint(e: TPointerEvent) {
-    if (this._absolutePointer) {
-      return this._absolutePointer;
+    if (this._scenePoint) {
+      return this._scenePoint;
     }
-    return this.getPointer(e);
+    return this._getPointerImpl(e);
   }
 
   /**
    * Returns pointer relative to canvas.
    *
-   * @deprecated This method is deprecated since v6 to protect you from misuse.
    * Use {@link getViewportPoint} or {@link getScenePoint} instead.
    *
    * @param {Event} e
    * @param {Boolean} [fromViewport] whether to return the point from the viewport or in the scene
    * @return {Point}
    */
-  getPointer(e: TPointerEvent, fromViewport = false): Point {
+  protected _getPointerImpl(e: TPointerEvent, fromViewport = false): Point {
     const upperCanvasEl = this.upperCanvasEl,
       bounds = upperCanvasEl.getBoundingClientRect();
     let pointer = getPointer(e),

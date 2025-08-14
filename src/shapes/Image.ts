@@ -28,7 +28,7 @@ import { WebGLFilterBackend } from '../filters/WebGLFilterBackend';
 import { FILL, NONE } from '../constants';
 import { getDocumentFromElement } from '../util/dom_misc';
 import type { CSSRules } from '../parser/typedefs';
-import type { Resize } from '../filters/Resize';
+import type { Resize, ResizeSerializedProps } from '../filters/Resize';
 import type { TCachedFabricObject } from './Object/Object';
 import { log } from '../util/internals/console';
 
@@ -62,7 +62,7 @@ export interface SerializedImageProps extends SerializedObjectProps {
   src: string;
   crossOrigin: TCrossOrigin;
   filters: any[];
-  resizeFilter?: any;
+  resizeFilter?: ResizeSerializedProps;
   cropX: number;
   cropY: number;
 }
@@ -133,7 +133,6 @@ export class FabricImage<
    * key used to retrieve the texture representing this image
    * @since 2.0.0
    * @type String
-   * @default
    */
   declare cacheKey: string;
 
@@ -141,7 +140,6 @@ export class FabricImage<
    * Image crop in pixels from original image size.
    * @since 2.0.0
    * @type Number
-   * @default
    */
   declare cropX: number;
 
@@ -149,7 +147,6 @@ export class FabricImage<
    * Image crop in pixels from original image size.
    * @since 2.0.0
    * @type Number
-   * @default
    */
   declare cropY: number;
 
@@ -158,13 +155,12 @@ export class FabricImage<
    * Also influence if the cacheCanvas for this image uses imageSmoothing
    * @since 4.0.0-beta.11
    * @type Boolean
-   * @default
    */
   declare imageSmoothing: boolean;
 
   declare preserveAspectRatio: string;
 
-  protected declare src: string;
+  declare protected src: string;
 
   declare filters: BaseFilter<string, Record<string, any>>[];
   declare resizeFilter: Resize;
@@ -233,7 +229,6 @@ export class FabricImage<
     this._element = element;
     this._originalElement = element;
     this._setWidthHeight(size);
-    element.classList.add(FabricImage.CSS_CANVAS);
     if (this.filters.length !== 0) {
       this.applyFilters();
     }
@@ -571,6 +566,7 @@ export class FabricImage<
       sourceWidth,
       sourceHeight,
       this._element as HTMLCanvasElement,
+      this.cacheKey,
     );
     if (
       this._originalElement.width !== this._element.width ||
@@ -758,18 +754,7 @@ export class FabricImage<
   }
 
   /**
-   * Default CSS class name for canvas
-   * Will be removed from fabric 7
-   * @static
-   * @deprecated
-   * @type String
-   * @default
-   */
-  static CSS_CANVAS = 'canvas-img';
-
-  /**
    * List of attribute names to account for when parsing SVG element (used by {@link FabricImage.fromElement})
-   * @static
    * @see {@link http://www.w3.org/TR/SVG/struct.html#ImageElement}
    */
   static ATTRIBUTE_NAMES = [
@@ -780,13 +765,13 @@ export class FabricImage<
     'height',
     'preserveAspectRatio',
     'xlink:href',
+    'href',
     'crossOrigin',
     'image-rendering',
   ];
 
   /**
    * Creates an instance of FabricImage from its object representation
-   * @static
    * @param {Object} object Object to create an instance from
    * @param {object} [options] Options object
    * @param {AbortSignal} [options.signal] handle aborting, see https://developer.mozilla.org/en-US/docs/Web/API/AbortController/signal
@@ -799,13 +784,13 @@ export class FabricImage<
     return Promise.all([
       loadImage(src!, { ...options, crossOrigin }),
       f && enlivenObjects<BaseFilter<string>>(f, options),
-      // TODO: redundant - handled by enlivenObjectEnlivables
-      rf && enlivenObjects<BaseFilter<'Resize'>>([rf], options),
+      // redundant - handled by enlivenObjectEnlivables, but nicely explicit
+      rf ? enlivenObjects<Resize>([rf], options) : [],
       enlivenObjectEnlivables(object, options),
-    ]).then(([el, filters = [], [resizeFilter] = [], hydratedProps = {}]) => {
+    ]).then(([el, filters = [], [resizeFilter], hydratedProps = {}]) => {
       return new this(el, {
         ...object,
-        // TODO: this creates a difference between image creation and restoring from JSON
+        // TODO: passing src creates a difference between image creation and restoring from JSON
         src,
         filters,
         resizeFilter,
@@ -816,7 +801,6 @@ export class FabricImage<
 
   /**
    * Creates an instance of Image from an URL string
-   * @static
    * @param {String} url URL to create an image from
    * @param {LoadImageOptions} [options] Options object
    * @returns {Promise<FabricImage>}
@@ -833,7 +817,6 @@ export class FabricImage<
 
   /**
    * Returns {@link FabricImage} instance from an SVG element
-   * @static
    * @param {HTMLElement} element Element to parse
    * @param {Object} [options] Options object
    * @param {AbortSignal} [options.signal] handle aborting, see https://developer.mozilla.org/en-US/docs/Web/API/AbortController/signal
@@ -850,7 +833,7 @@ export class FabricImage<
       cssRules,
     );
     return this.fromURL(
-      parsedAttributes['xlink:href'],
+      parsedAttributes['xlink:href'] || parsedAttributes['href'],
       options,
       parsedAttributes,
     ).catch((err) => {
